@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS - Tindahan ni Dante</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{margin:0;background:#FFF8E1;padding-bottom:140px}
+.topbar{background:#C62828;height:16px;border-radius:0 0 20px 20px}
+.wrap{background:#fff;margin:10px;border-radius:22px;border-top:8px solid #C62828;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:14px;min-height:70vh}
+h1{text-align:center;color:#C62828;margin:6px 0 12px;font-size:26px}
+.backbtn{background:#757575;color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:bold;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bigbtn{background:linear-gradient(#FFCC80,#FFB74D);border:0;border-radius:16px;padding:22px 8px;font-size:18px;font-weight:bold;color:#B71C1C;cursor:pointer;min-height:120px}
+.pill{padding:10px 14px;border-radius:20px;border:0;font-weight:bold;cursor:pointer;background:#FFE0B2;color:#B71C1C;white-space:nowrap}
+.pill.active{background:#C62828;color:#fff}
+.pillrow{display:flex;gap:8px;overflow-x:auto;padding:8px 0}
+.prod{border:2px solid #FFCC80;border-radius:14px;overflow:hidden;background:#fff;cursor:pointer}
+.prod img{width:100%;height:130px;object-fit:cover;background:#FFF3E0;display:block}
+.prod .info{padding:8px;text-align:center}
+.prod b{color:#B71C1C;font-size:15px}
+.prod .price{color:#2E7D32;font-weight:bold;font-size:19px;margin-top:4px}
+.prod small{color:#666;font-size:11px;display:block}
+.hidden{display:none}
+.cartbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border:3px solid #C62828;border-radius:14px 14px 0 0;padding:10px 12px;z-index:99}
+.cartbar b{float:right;color:#C62828;font-size:20px}
+.checkout{background:#C62828;color:#fff;border:0;width:100%;padding:13px;border-radius:10px;font-weight:bold;font-size:17px;margin-top:8px}
+.checkout:disabled{background:#BDBDBD}
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+<div id="pageCat" class="wrap">
+  <button class="backbtn" onclick="location.href='index.html'">← Back to Menu</button>
+  <h1>🛒 Select Category</h1>
+  <div class="grid2" id="catGrid"></div>
+</div>
+<div id="pageProd" class="wrap hidden">
+  <button class="backbtn" onclick="showCat()">← Back to Menu</button>
+  <h1 id="prodTitle">🛒 Products</h1>
+  <div style="display:flex;gap:8px;margin:10px 0">
+    <button class="pill active" id="tRetail" onclick="setType('Retail')">👤 Retail</button>
+    <button class="pill" id="tBulk" onclick="setType('Bulk')">🏢 Bulk</button>
+    <button class="pill" id="tVIP" onclick="setType('VIP')">💎 VIP</button>
+  </div>
+  <div class="pillrow" id="filterRow"></div>
+  <div class="grid2" id="prodGrid"></div>
+</div>
+<div class="cartbar">
+  <div id="cartItems">No items yet</div>
+  <div style="margin-top:6px">Total: <b id="cartTotal">₱0</b></div>
+  <button class="checkout" id="btnCheckout" disabled>Checkout</button>
+</div>
+
+<script type="module">
+import { db } from './firebase-config.js';
+import { collection, getDocs, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+let cats=["Bigas","Condiments","Dairy & Eggs","Beverages","Noodles","Snacks","Household","Others"];
+let products=[]; let cart=[]; let curCat='All'; let curType='Retail';
+
+async function load(){
+  const snap = await getDocs(collection(db,"products"));
+  products = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  renderCats();
+}
+function showCat(){document.getElementById('pageProd').classList.add('hidden');document.getElementById('pageCat').classList.remove('hidden');}
+window.showCat = showCat;
+function openCat(c){curCat=c;document.getElementById('prodTitle').innerText='🛒 '+(c==='All'?'All Products':c);document.getElementById('pageCat').classList.add('hidden');document.getElementById('pageProd').classList.remove('hidden');renderProds();}
+window.openCat = openCat;
+function setType(t){curType=t;['tRetail','tBulk','tVIP'].forEach(x=>document.getElementById(x).classList.remove('active'));document.getElementById(t==='Retail'?'tRetail':t==='Bulk'?'tBulk':'tVIP').classList.add('active');renderProds();}
+window.setType = setType;
+
+function renderCats(){let h='';cats.forEach(c=>{h+=`<button class="bigbtn" onclick="openCat('${c}')">${c}</button>`});h+=`<button class="bigbtn" onclick="openCat('All')">All</button>`;document.getElementById('catGrid').innerHTML=h;}
+function renderProds(){
+  let fRow='<button class="pill '+(curCat==='All'?'active':'')+'" onclick="openCat(\'All\')">All</button>';cats.forEach(c=>{fRow+=`<button class="pill ${curCat===c?'active':''}" onclick="openCat('${c}')">${c}</button>`});
+  document.getElementById('filterRow').innerHTML=fRow;
+  let list=products.filter(p=>curCat==='All'||p.cat===curCat);
+  let h='';
+  list.forEach(p=>{
+    let price=curType==='Retail'?p.retail:curType==='Bulk'?(p.bulk||p.retail):(p.vip||p.retail);
+    let img=p.img||'https://via.placeholder.com/400x300?text='+encodeURIComponent(p.name);
+    h+=`<div class="prod" onclick="addToCart('${p.id}')"><img src="${img}"><div class="info"><b>${p.name}</b><div class="price">₱${price}</div><small>Bulk:₱${p.bulk||p.retail} VIP:₱${p.vip||p.retail}</small><small style="color:${p.stock<=3?'red':'#2E7D32'};font-weight:bold">Stock: ${p.stock}</small></div></div>`;
+  });
+  document.getElementById('prodGrid').innerHTML=h||'<p style="text-align:center">Wala pang product. Punta ka sa products.html</p>';
+}
+window.addToCart = (id)=>{
+  let p=products.find(x=>x.id===id);
+  if(p.stock<=0){alert('Ubos na '+p.name);return;}
+  let price=curType==='Retail'?p.retail:curType==='Bulk'?(p.bulk||p.retail):(p.vip||p.retail);
+  let ex=cart.find(x=>x.id===id&&x.type===curType);
+  if(ex){if(ex.qty>=p.stock){alert('Hanggang '+p.stock+' lang');return;} ex.qty++;} else cart.push({id:id,name:p.name,price:price,qty:1,type:curType});
+  renderCart();
+};
+function renderCart(){
+  if(cart.length===0){document.getElementById('cartItems').innerText='No items yet';document.getElementById('cartTotal').innerText='₱0';document.getElementById('btnCheckout').disabled=true;return;}
+  let total=0;let h='';cart.forEach((c,i)=>{total+=c.price*c.qty;h+=`${c.name} x${c.qty} - ₱${c.price*c.qty} <span style="color:red;cursor:pointer" onclick="window.delCart(${i})">✕</span><br>`});
+  document.getElementById('cartItems').innerHTML=h;document.getElementById('cartTotal').innerText='₱'+total;document.getElementById('btnCheckout').disabled=false;
+}
+window.delCart = (i)=>{cart.splice(i,1);renderCart();};
+
+document.getElementById('btnCheckout').onclick = async ()=>{
+  let total=cart.reduce((a,c)=>a+c.price*c.qty,0);
+  // AUTO BAWAS SA FIRESTORE
+  for(let c of cart){
+    let p=products.find(x=>x.id===c.id);
+    await updateDoc(doc(db,"products",c.id),{stock: p.stock - c.qty});
+  }
+  await addDoc(collection(db,"sales"),{items:cart.map(c=>c.name+' x'+c.qty).join(', '),total:total,date:new Date().toISOString()});
+  cart=[];renderCart();await load();renderProds();
+  alert('Nabayaran! ₱'+total+'\nNabawas na sa Firestore!');
+};
+load();
+</script>
+</body>
+</html>
