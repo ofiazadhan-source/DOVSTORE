@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Products - Tindahan ni Dante</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{margin:0;background:#FFF8E1;padding-bottom:20px}
+.topbar{background:#C62828;height:16px;border-radius:0 0 20px 20px}
+.wrap{background:#fff;margin:10px;border-radius:22px;border-top:8px solid #C62828;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:14px;min-height:80vh}
+h1{text-align:center;color:#C62828;margin:6px 0 12px;font-size:24px}
+.backbtn{background:#757575;color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:bold;cursor:pointer}
+input,select{width:100%;padding:12px;margin:6px 0;border:1px solid #ddd;border-radius:10px;font-size:15px}
+.btn-orange{background:#FF8F00;color:#fff;border:0;padding:13px;border-radius:10px;font-weight:bold;width:100%;cursor:pointer;font-size:16px}
+.btn-green{background:#2E7D32;color:#fff;border:0;padding:13px;border-radius:10px;font-weight:bold;width:100%;cursor:pointer;font-size:16px}
+.btn-small{padding:10px 12px;border:0;border-radius:10px;font-weight:bold;cursor:pointer}
+.pill{padding:9px 13px;border-radius:20px;border:0;font-weight:bold;cursor:pointer;background:#FFE0B2;color:#B71C1C;white-space:nowrap}
+.pill.active{background:#C62828;color:#fff}
+.pillrow{display:flex;gap:8px;overflow-x:auto;padding:8px 0}
+.card{border:2px solid #FFCC80;border-radius:14px;padding:10px;margin-bottom:10px;display:flex;gap:10px;align-items:center;background:#fff}
+.card img{width:70px;height:70px;object-fit:cover;border-radius:10px;background:#FFF3E0;flex-shrink:0}
+.card b{color:#B71C1C;font-size:16px}
+.card small{color:#666;font-size:12px;display:block;line-height:1.4}
+.btns{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.btns button{padding:7px 10px;border:0;border-radius:7px;font-weight:bold;cursor:pointer;font-size:13px}
+.edit{background:#FFB74D}
+.plus{background:#A5D6A7}
+.del{background:#E53935;color:#fff}
+.hidden{display:none}
+.catbox{background:#FFF3E0;border-radius:12px;padding:10px;margin:10px 0}
+.catitem{display:flex;justify-content:space-between;align-items:center;background:#fff;padding:8px 10px;border-radius:8px;margin:4px 0}
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+
+<div class="wrap">
+  <button class="backbtn" onclick="location.href='index.html'">← Back to Menu</button>
+  <h1>🛒 Products<br><small style="font-size:14px;color:#666">add & edit</small></h1>
+
+  <!-- MANAGE CATEGORY - BAGO ITO BOSS -->
+  <div class="catbox">
+    <b style="color:#B71C1C">📂 Mga Category Mo</b><br>
+    <small style="color:#666">Dito ka mag-add ng Frozen Foods, etc.</small>
+    <div style="display:flex;gap:6px">
+      <input id="newCat" placeholder="Bagong Category: Hal. Frozen Foods" style="flex:1">
+      <button class="btn-small" style="background:#FF8F00;color:#fff;white-space:nowrap" onclick="addCategory()">+ ADD</button>
+    </div>
+    <div id="catManage"></div>
+  </div>
+
+  <!-- FORM PRODUCT -->
+  <div id="formTitle" style="font-weight:bold;color:#B71C1C;margin-bottom:2px">➕ Magdagdag ng Bagong Product</div>
+  <input id="fName" placeholder="Pangalan: Hal. Bigas, Asin, Hotdog, Tocino">
+  
+  <select id="fCat" onchange="checkNewCat()"></select>
+  <input id="fCatNew" class="hidden" placeholder="Isulat bagong category: Hal. Frozen Foods">
+
+  <input id="fRetail" type="number" placeholder="Retail Price: Hal. 50">
+  <input id="fBulk" type="number" placeholder="Bulk Price: Hal. 48 (optional)">
+  <input id="fVIP" type="number" placeholder="VIP Price: Hal. 49 (optional)">
+  <input id="fStock" type="number" placeholder="Stock: Hal. 20">
+  <input id="fImg" placeholder="Picture link (optional) - pwede blank">
+
+  <button id="btnSave" class="btn-orange" onclick="saveProduct()">IDAGDAG</button>
+  <button id="btnCancel" class="hidden" style="background:#999;color:#fff;border:0;padding:11px;border-radius:10px;width:100%;margin-top:6px;font-weight:bold" onclick="cancelEdit()">Cancel Edit</button>
+
+  <hr style="margin:16px 0;border:1px solid #FFE0B2">
+
+  <input id="search" placeholder="🔍 Hanapin: Hal. Asin..." oninput="renderList()">
+  <div class="pillrow" id="filterRow"></div>
+  <div style="font-weight:bold;margin:6px 0"><span id="count">0</span> products</div>
+  <div id="list"></div>
+</div>
+
+<script>
+let KEY='DANTE_NEW_products';
+let CATKEY='DANTE_NEW_cats';
+let products=JSON.parse(localStorage.getItem(KEY)||'[]');
+// DEFAULT CATS + KUNG MAY NA-ADD KA NA DATI, YUN ANG GAGAMITIN
+let cats=JSON.parse(localStorage.getItem(CATKEY)||'["Bigas","Condiments","Dairy & Eggs","Beverages","Noodles","Snacks","Household","Frozen Foods","Others"]');
+let curFilter='All';
+let editId=null;
+
+function save(){localStorage.setItem(KEY,JSON.stringify(products));localStorage.setItem(CATKEY,JSON.stringify(cats));}
+
+// --- CATEGORY ---
+function addCategory(){
+  let v=document.getElementById('newCat').value.trim();
+  if(!v){alert('Boss, isulat mo muna category. Hal. Frozen Foods');return;}
+  if(cats.includes(v)){alert('May ganyan ka na boss');return;}
+  cats.push(v); save(); document.getElementById('newCat').value='';
+  renderCats(); renderFilter(); renderCatManage();
+  alert('Nadagdag na category: '+v);
+}
+function delCategory(c){
+  let used=products.filter(p=>p.cat===c).length;
+  if(used>0){alert('Hindi pwede burahin boss, may '+used+' products pa sa '+c+'. Ilipat mo muna o burahin yung products.');return;}
+  if(confirm('Burahin category '+c+'?')){cats=cats.filter(x=>x!==c);save();renderCats();renderFilter();renderCatManage();}
+}
+function renderCatManage(){
+  let h=''; cats.forEach(c=>{h+=`<div class="catitem"><span>${c} <small style="color:#999">(${products.filter(p=>p.cat===c).length})</small></span><button onclick="delCategory('${c}')" style="background:#E53935;color:#fff;border:0;padding:5px 10px;border-radius:6px">Burahin</button></div>`});
+  document.getElementById('catManage').innerHTML=h;
+}
+function renderCats(){
+  let h=''; cats.forEach(c=>{h+=`<option value="${c}">${c}</option>`});
+  h+=`<option value="__NEW__">➕ Bagong Category...</option>`;
+  document.getElementById('fCat').innerHTML=h;
+}
+function checkNewCat(){
+  let v=document.getElementById('fCat').value;
+  if(v==='__NEW__'){document.getElementById('fCatNew').classList.remove('hidden');}
+  else{document.getElementById('fCatNew').classList.add('hidden');}
+}
+
+// --- PRODUCT ---
+function renderFilter(){
+  let all=['All',...cats];
+  let h=''; all.forEach(c=>{h+=`<button class="pill ${curFilter===c?'active':''}" onclick="setFilter('${c}')">${c}</button>`});
+  document.getElementById('filterRow').innerHTML=h;
+}
+function setFilter(c){curFilter=c;renderFilter();renderList();}
+
+function saveProduct(){
+  let n=document.getElementById('fName').value.trim();
+  let c=document.getElementById('fCat').value;
+  if(c==='__NEW__'){
+    c=document.getElementById('fCatNew').value.trim();
+    if(!c){alert('Isulat mo yung bagong category');return;}
+    if(!cats.includes(c)){cats.push(c);save();renderCats();renderFilter();renderCatManage();}
+  }
+  let r=parseFloat(document.getElementById('fRetail').value);
+  let b=parseFloat(document.getElementById('fBulk').value)||r;
+  let v=parseFloat(document.getElementById('fVIP').value)||r;
+  let s=parseInt(document.getElementById('fStock').value);
+  let img=document.getElementById('fImg').value.trim();
+  if(!n||isNaN(r)||isNaN(s)){alert('Boss, lagay mo: Pangalan, Presyo, Stock');return;}
+  if(editId){
+    let p=products.find(x=>x.id===editId);
+    p.name=n; p.cat=c; p.retail=r; p.bulk=b; p.vip=v; p.stock=s; if(img) p.img=img;
+    alert('Na-update na '+n);
+  } else {
+    products.push({id:Date.now(),name:n,cat:c,retail:r,bulk:b,vip:v,stock:s,img:img});
+    alert('Nadagdag na '+n+' sa '+c);
+  }
+  save(); clearForm(); renderList(); renderCatManage();
+}
+function clearForm(){
+  editId=null;
+  ['fName','fRetail','fBulk','fVIP','fStock','fImg','fCatNew'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fCatNew').classList.add('hidden');
+  document.getElementById('formTitle').innerText='➕ Magdagdag ng Bagong Product';
+  document.getElementById('btnSave').innerText='IDAGDAG';
+  document.getElementById('btnSave').className='btn-orange';
+  document.getElementById('btnCancel').classList.add('hidden');
+  renderCats();
+}
+function cancelEdit(){clearForm();}
+function editProd(id){
+  let p=products.find(x=>x.id===id);
+  editId=id;
+  if(!cats.includes(p.cat)){cats.push(p.cat);save();renderCats();renderFilter();}
+  document.getElementById('fName').value=p.name;
+  document.getElementById('fCat').value=p.cat;
+  document.getElementById('fRetail').value=p.retail;
+  document.getElementById('fBulk').value=p.bulk;
+  document.getElementById('fVIP').value=p.vip;
+  document.getElementById('fStock').value=p.stock;
+  document.getElementById('fImg').value=p.img||'';
+  document.getElementById('formTitle').innerText='✏️ Ina-edit mo: '+p.name;
+  document.getElementById('btnSave').innerText='SAVE CHANGES';
+  document.getElementById('btnSave').className='btn-green';
+  document.getElementById('btnCancel').classList.remove('hidden');
+  window.scrollTo(0,0);
+}
+function addStock(id){let p=products.find(x=>x.id===id);let q=prompt('Ilan idadagdag sa '+p.name+'?','10');if(q&&!isNaN(q)){p.stock+=parseInt(q);save();renderList();renderCatManage();}}
+function minusStock(id){let p=products.find(x=>x.id===id);if(p.stock<=0){alert('Ubos na');return;}p.stock--;save();renderList();}
+function delProd(id){let p=products.find(x=>x.id===id);if(confirm('Burahin si '+p.name+'?')){products=products.filter(x=>x.id!==id);save();renderList();renderCatManage();}}
+function renderList(){
+  let kw=document.getElementById('search').value.toLowerCase();
+  // AYUSIN YUNG LUMANG CATEGORY NAME NA "Bigas / Staples" -> "Bigas"
+  products.forEach(p=>{if(p.cat.includes('/')){p.cat=p.cat.split('/')[0].trim();}});
+  let list=products.filter(p=>(curFilter==='All'||p.cat===curFilter)&&p.name.toLowerCase().includes(kw));
+  document.getElementById('count').innerText=list.length;
+  let h=''; if(list.length===0) h='<p style="text-align:center;color:#999">Walang product dito. Magdagdag ka sa taas boss.</p>';
+  list.forEach(p=>{
+    let img=p.img||'https://via.placeholder.com/200x200?text='+encodeURIComponent(p.name);
+    h+=`<div class="card"><img src="${img}" onerror="this.src='https://via.placeholder.com/200x200?text=${p.name}'"><div style="flex:1"><b>${p.name}</b><small>${p.cat}</small><small>Retail: ₱${p.retail} • Bulk: ₱${p.bulk||p.retail} • VIP: ₱${p.vip||p.retail}</small><small style="color:${p.stock<=3?'red':'#2E7D32'};font-weight:bold">Stock: ${p.stock} ${p.stock<=3?'(PAUBOS!)':''}</small><div class="btns"><button class="edit" onclick="editProd(${p.id})">✏️ Edit</button><button class="plus" onclick="addStock(${p.id})">+ Stock</button><button class="plus" onclick="minusStock(${p.id})">- Stock</button><button class="del" onclick="delProd(${p.id})">Burahin</button></div></div></div>`;
+  });
+  document.getElementById('list').innerHTML=h;
+}
+renderCats(); renderFilter(); renderList(); renderCatManage();
+</script>
+</body>
+</html>
