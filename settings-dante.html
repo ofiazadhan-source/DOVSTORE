@@ -1,1 +1,194 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings - Tindahan ni Dante</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif}
+body{background:linear-gradient(135deg,#FFF8E1,#FFE0B2)}
+.header{background:linear-gradient(135deg,#D32F2F,#B71C1C);color:#fff;padding:15px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+.header h1{font-size:18px;font-weight:700}
+.header a{color:#D32F2F;background:#fff;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:8px;font-size:14px}
+.container{padding:20px;max-width:600px;margin:0 auto}
+.login-box{background:#fff;border-radius:16px;padding:25px;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-top:30px}
+.login-box h2{color:#D32F2F;margin-bottom:15px;text-align:center}
+.login-box input{width:100%;padding:12px;border:2px solid #FFE0B2;border-radius:10px;font-size:15px;margin-bottom:10px}
+.login-box button{width:100%;padding:12px;background:#D32F2F;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer}
+.error-msg{color:#D32F2F;font-size:13px;margin-top:10px;text-align:center}
+.success-msg{color:#2E7D32;font-size:13px;margin-top:10px;text-align:center;font-weight:600}
+.show-pass{display:flex;align-items:center;gap:8px;margin:2px 0 15px 2px;font-size:14px;color:#555}
+.show-pass input{width:auto;margin:0;accent-color:#D32F2F;width:18px;height:18px}
+.forgot-btn{background:none!important;border:0;color:#D32F2F!important;font-weight:600;font-size:14px;margin-top:12px;cursor:pointer;width:100%;padding:10px!important}
+.settings-content{display:none}
+.card{background:#fff;border-radius:16px;padding:20px;margin-bottom:20px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.card h3{color:#D32F2F;margin-bottom:10px}
+.card p{font-size:13px;color:#666;margin-bottom:15px}
+.reset-grid{display:grid;gap:10px}
+.reset-btn{padding:12px;border:none;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px}
+.btn-orange{background:#FFA726;color:#fff}
+.btn-red{background:#f44336;color:#fff}
+.warning-box{background:#FFF3CD;border-left:4px solid #FFC107;padding:12px;border-radius:8px;font-size:13px;color:#856404;margin-bottom:15px}
+.user-info{background:#E3F2FD;padding:10px;border-radius:8px;margin-bottom:15px;font-size:13px;color:#1565C0}
+.logout-btn{background:#666;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<div class="header"><h1>⚙️ Settings - Dante</h1><a href="index.html">← Back</a></div>
+<div class="container">
+  <div class="login-box" id="loginBox">
+    <h2>🔒 Admin Login<br><small style="font-size:13px;color:#666">Tindahan ni Dante</small></h2>
+    <input type="email" id="emailInput" placeholder="Email" autocomplete="email">
+    <input type="password" id="passwordInput" placeholder="Password" onkeyup="if(event.key==='Enter') login()">
+    <label class="show-pass"><input type="checkbox" id="showPass" onclick="togglePassword()"> Show Password</label>
+    <button id="loginBtn" onclick="login()">Login</button>
+    <button class="forgot-btn" id="forgotBtn" onclick="forgotPass()">Forgot Password? I-email sakin yung reset link</button>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="success-msg" id="successMsg"></div>
+  </div>
 
+  <div class="settings-content" id="settingsContent">
+    <div class="user-info"><span id="userEmail">Loading...</span><button class="logout-btn" onclick="logout()" style="float:right;">Logout</button></div>
+    <div class="warning-box">⚠️ Warning: Buburahin nito pati yung nasa Cloud (Firestore) at yung nasa Phone. Hindi na maibabalik.</div>
+    <div class="card">
+      <h3>🧹 Reset Data - Tindahan ni Dante</h3>
+      <p>Pag pinindot mo to, dapat pati Main Menu mo magiging ₱0 na rin.</p>
+      <div class="reset-grid">
+        <button class="reset-btn btn-orange" onclick="resetSales()">Reset Benta / Sales Only</button>
+        <button class="reset-btn btn-orange" onclick="resetExpenses()">Reset Expenses Only</button>
+        <button class="reset-btn btn-orange" onclick="resetProducts()">Reset Products Only</button>
+        <button class="reset-btn btn-orange" onclick="resetCats()">Reset Categories Only</button>
+        <button class="reset-btn btn-red" onclick="resetAll()">🗑️ Reset ALL Data ni Dante</button>
+      </div>
+    </div>
+    <div class="card"><h3>ℹ️ System Info - Dante</h3><p id="systemInfo">Loading...</p><button onclick="loadSystemInfo()" style="background:#eee;border:0;padding:8px 12px;border-radius:8px;font-weight:bold;margin-top:8px">🔄 Refresh Info</button></div>
+  </div>
+</div>
+
+<script type="module">
+import { db } from './firebase-config.js';
+import { collection, getDocs, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+const auth = getAuth();
+
+window.togglePassword = function(){ let p=document.getElementById('passwordInput'); let c=document.getElementById('showPass'); p.type=c.checked?'text':'password'; }
+window.forgotPass = async function(){
+  let email=document.getElementById('emailInput').value.trim();
+  let err=document.getElementById('errorMsg'), suc=document.getElementById('successMsg'), btn=document.getElementById('forgotBtn');
+  err.textContent=''; suc.textContent='';
+  if(!email){err.textContent='Lagay mo muna email mo';return;}
+  btn.disabled=true; btn.textContent='Nagse-send...';
+  try{ await sendPasswordResetEmail(auth,email); suc.textContent='✅ Na-send na! Check mo email mo (pati Spam).'; }
+  catch(e){ err.textContent='❌ '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='Forgot Password? I-email sakin yung reset link'; }
+}
+onAuthStateChanged(auth,(user)=>{
+  if(user){ document.getElementById('loginBox').style.display='none'; document.getElementById('settingsContent').style.display='block'; document.getElementById('userEmail').textContent=user.email; loadSystemInfo(); }
+  else{ document.getElementById('loginBox').style.display='block'; document.getElementById('settingsContent').style.display='none'; }
+});
+window.login = async function(){
+  let email=document.getElementById('emailInput').value.trim();
+  let pass=document.getElementById('passwordInput').value;
+  let btn=document.getElementById('loginBtn'), err=document.getElementById('errorMsg');
+  err.textContent='';
+  if(!email||!pass){err.textContent='Fill up email and password';return;}
+  btn.disabled=true; btn.textContent='Logging in...';
+  try{ await signInWithEmailAndPassword(auth,email,pass); }
+  catch(e){ err.textContent='❌ Wrong email or password'; }
+  finally{ btn.disabled=false; btn.textContent='Login'; }
+}
+window.logout = async function(){ await signOut(auth); document.getElementById('emailInput').value=''; document.getElementById('passwordInput').value=''; }
+
+// === AYOS DITO BOSS: LAHAT NG POSIBLENG COLLECTION NAME NG DANTE, BUBURAHIN ===
+async function deleteCollection(name){
+  try{
+    let snap=await getDocs(collection(db,name));
+    if(snap.empty){ console.log('empty '+name); return 0; }
+    // Firestore batch max 500, kaya uulit-ulitin natin hanggat may laman
+    while(true){
+      let s2=await getDocs(collection(db,name));
+      if(s2.empty) break;
+      let batch=writeBatch(db);
+      let count=0;
+      s2.forEach(d=>{ if(count<400){ batch.delete(doc(db,name,d.id)); count++; } });
+      await batch.commit();
+      if(s2.size<=400) break;
+    }
+    console.log('deleted '+name);
+    return 1;
+  }catch(e){ console.log('skip '+name+' - '+e.message); return 0; }
+}
+function clearLocalDante(){
+  // Burahin LAHAT ng key na may DANTE, DHAN, BENTA, SALES sa phone mo
+  let toRemove=[];
+  for(let i=0;i<localStorage.length;i++){ let k=localStorage.key(i); if(k.toLowerCase().includes('dante')||k.toLowerCase().includes('dhan')||k.toLowerCase().includes('benta')||k.toLowerCase().includes('sales')||k.toLowerCase().includes('expense')) toRemove.push(k); }
+  toRemove.forEach(k=>localStorage.removeItem(k));
+  // Yung mga specific na alam natin
+  ['DANTE_NEW_products','DANTE_NEW_cats','DANTE_NEW_sales','DANTE_NEW_expenses','DANTE_NEW_today','dante_products','dante_sales','dante_expenses','dante_today_sales','todaySales'].forEach(k=>localStorage.removeItem(k));
+}
+
+window.loadSystemInfo = async function(){
+  // Local
+  let prods=JSON.parse(localStorage.getItem('DANTE_NEW_products')||'[]');
+  let cats=JSON.parse(localStorage.getItem('DANTE_NEW_cats')||'[]');
+  // Cloud - check natin talaga yung Firestore
+  let cloudSales=0, cloudProds=0, cloudExp=0;
+  try{ let s=await getDocs(collection(db,'dhan-sales')); cloudSales=s.size; }catch(e){}
+  try{ let s=await getDocs(collection(db,'dhan-pos-web')); cloudProds=s.size; }catch(e){}
+  try{ let s=await getDocs(collection(db,'dhan-expenses')); cloudExp=s.size; }catch(e){}
+  // Kung iba yung collection ng Dante mo, try rin natin yung iba
+  if(cloudSales===0){ try{ let s=await getDocs(collection(db,'dante-sales')); cloudSales=s.size; }catch(e){} }
+  if(cloudProds===0){ try{ let s=await getDocs(collection(db,'dante-products')); cloudProds=s.size; }catch(e){} }
+
+  document.getElementById('systemInfo').innerHTML=`
+    <strong>Products (Phone):</strong> ${prods.length}<br>
+    <strong>Categories (Phone):</strong> ${cats.length}<br>
+    <strong>Sales sa Cloud (Firestore):</strong> ${cloudSales}<br>
+    <strong>Products sa Cloud (Firestore):</strong> ${cloudProds}<br>
+    <strong>Expenses sa Cloud:</strong> ${cloudExp}<br>
+    <small style="color:#888">Kung 0 na lahat dito, dapat 0 na rin sa Main Menu pag ni-refresh mo.</small>`;
+}
+
+window.resetSales = async function(){
+  if(!confirm('Sigurado ka? Buburahin BENTA ni Dante pati sa Cloud. Magiging ₱0 na Main Menu mo.')) return;
+  clearLocalDante();
+  // Burahin LAHAT ng posibleng sales collection
+  await deleteCollection('dhan-sales');
+  await deleteCollection('dante-sales');
+  await deleteCollection('sales');
+  await deleteCollection('DANTE_sales');
+  alert('✅ Benta na-reset na! Balik ka sa Main Menu at i-refresh mo (pull down). Dapat ₱0 na.'); loadSystemInfo();
+}
+window.resetExpenses = async function(){
+  if(!confirm('Sigurado ka? Buburahin EXPENSES ni Dante.')) return;
+  clearLocalDante();
+  await deleteCollection('dhan-expenses');
+  await deleteCollection('dante-expenses');
+  await deleteCollection('expenses');
+  alert('✅ Expenses na-reset na!'); loadSystemInfo();
+}
+window.resetProducts = async function(){
+  if(!confirm('Sigurado ka? Buburahin PRODUCTS ni Dante (25 products).')) return;
+  localStorage.removeItem('DANTE_NEW_products');
+  await deleteCollection('dhan-pos-web');
+  await deleteCollection('dante-products');
+  await deleteCollection('products');
+  alert('✅ Products na-reset na!'); loadSystemInfo();
+}
+window.resetCats = async function(){
+  if(!confirm('Sigurado ka? Buburahin CATEGORIES.')) return;
+  localStorage.removeItem('DANTE_NEW_cats');
+  alert('✅ Categories na-reset na!'); loadSystemInfo();
+}
+window.resetAll = async function(){
+  if(!confirm('⚠️ DANGER! Buburahin LAHAT ni Dante: Products, Benta, Expenses, Categories - Phone + Cloud.')) return;
+  let t=prompt('Type "DELETE ALL" para magpatuloy:');
+  if(t!=='DELETE ALL'){alert('Cancelled');return;}
+  clearLocalDante();
+  await Promise.all([deleteCollection('dhan-sales'),deleteCollection('dhan-expenses'),deleteCollection('dhan-pos-web'),deleteCollection('dante-sales'),deleteCollection('dante-products'),deleteCollection('dante-expenses'),deleteCollection('sales'),deleteCollection('products')]);
+  alert('✅ Lahat na-reset na! Balik ka sa Main Menu at i-refresh mo. Dapat ₱0 at 0 products na.'); loadSystemInfo();
+}
+</script>
+</body>
+</html>
